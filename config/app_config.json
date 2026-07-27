@@ -1,0 +1,9 @@
+{
+  "language": "pt-BR",
+  "theme": "cyberpunk",
+  "default_projects_dir": "C:\\Users\\franklin\\.gemini\\antigravity\\scratch\\AUTOMA\\projects",
+  "max_processes": 4,
+  "max_cpu_usage": 80,
+  "max_ram_usage": 80,
+  "max_gpu_usage": 80
+}

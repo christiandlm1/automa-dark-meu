@@ -1,0 +1,32 @@
+# AUTOMA Backend - Python Dependencies
+# Core
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.36
+aiosqlite>=0.20.0
+
+# Video metadata (NOT FFmpeg)
+pymediainfo>=6.1.0
+
+# Video thumbnails (NOT FFmpeg)
+opencv-python-headless>=4.10.0
+
+# Hardware detection
+psutil>=6.1.0
+py-cpuinfo>=9.0.0
+GPUtil>=1.4.0
+wmi>=1.5.1; sys_platform == "win32"
+pywin32>=308; sys_platform == "win32"
+
+# File hashing (fast)
+xxhash>=3.5.0
+
+# Async file operations
+aiofiles>=24.1.0
+
+# WebSocket support (included in uvicorn[standard])
+websockets>=14.0
