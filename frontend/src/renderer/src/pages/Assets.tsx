@@ -14,6 +14,7 @@ import {
 import { Card } from '../components/ui/Card'
 import { Modal } from '../components/ui/Modal'
 import { VirtuosoGrid } from 'react-virtuoso'
+import { API_BASE_URL } from '../services/api'
 
 export const Assets: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([])
@@ -172,7 +173,7 @@ export const Assets: React.FC = () => {
                     <div
                       className="w-full h-full bg-cover bg-center"
                       style={{
-                        backgroundImage: `url(http://127.0.0.1:8420/assets/${asset.file_path.split('\\').pop()?.split('/').pop()})`
+                        backgroundImage: `url(${API_BASE_URL}/assets/${asset.id}/file)`
                       }}
                     />
                   ) : asset.type === 'video_background' ? (

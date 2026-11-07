@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import json
 import shutil
 from pathlib import Path
+from typing import Dict
 from utils.template_packager import export_template_to_file, import_template_from_file
 from config import settings
 
 from database import get_db
 from controllers.video_template_controller import VideoTemplateController
+from repositories.asset_repository import AssetRepository
 from schemas.video_template import (
     VideoTemplateCreate,
     VideoTemplateResponse,
@@ -100,20 +102,6 @@ async def restore_template_version(
     return await controller.restore_version(template_id, version)
 
 
-from typing import Dict
-from database import get_db, async_session_maker
-from controllers.video_template_controller import VideoTemplateController
-from repositories.asset_repository import AssetRepository
-from schemas.video_template import (
-    VideoTemplateCreate,
-    VideoTemplateResponse,
-    VideoTemplateUpdate,
-    VideoTemplateListResponse,
-)
-
-router = APIRouter(prefix="/video-templates", tags=["templates"])
-
-
 @router.get("/{template_id}/export")
 async def export_template(
     template_id: str,
@@ -157,7 +145,7 @@ async def import_template(
         with open(temp_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        template_data = import_template_from_file(temp_file, db=db)
+        template_data = await import_template_from_file(temp_file, db=db)
         
         create_data = VideoTemplateCreate(
             name=f"{template_data.get('name', 'Imported')} (Imported)",

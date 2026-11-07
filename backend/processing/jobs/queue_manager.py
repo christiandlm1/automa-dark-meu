@@ -199,6 +199,9 @@ class QueueManager:
             details={"job_id": job.id},
         )
         
+        # Release the write lock before listeners write to the DB (SQLite)
+        await self.session.commit()
+        
         # Publish event as failed (cancelled)
         await event_bus.publish(EVENT_JOB_FAILED, job, "Cancelado pelo usuário.")
         
@@ -224,6 +227,9 @@ class QueueManager:
             details={"job_id": job.id},
         )
         
+        # Release the write lock before listeners write to the DB (SQLite)
+        await self.session.commit()
+        
         # Publish event
         await event_bus.publish(EVENT_JOB_FINISHED, job)
         
@@ -247,6 +253,9 @@ class QueueManager:
             message=f"Falha no processamento do vídeo '{job.video.name}': {error_message}",
             details={"job_id": job.id, "error": error_message},
         )
+        
+        # Release the write lock before listeners write to the DB (SQLite)
+        await self.session.commit()
         
         # Publish event
         await event_bus.publish(EVENT_JOB_FAILED, job, error_message)

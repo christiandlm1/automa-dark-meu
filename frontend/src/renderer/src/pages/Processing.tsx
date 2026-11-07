@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { TableCell } from '../components/ui/Table'
 import { Button } from '../components/ui/Button'
@@ -189,8 +189,47 @@ export const Processing: React.FC = () => {
   const processPriority = wsConnected && wsData ? wsData.priority : stats?.priority || 'Normal'
 
   // Running jobs details from WS or REST
-  const runningJobsList =
-    wsConnected && wsData ? wsData.running_jobs : jobs.filter((j) => j.status === 'running')
+  const runningJobsList: Array<{
+    id: string
+    video_name?: string
+    progress: number
+    status: string
+    speed: number
+    estimated_time: number | null
+  }> =
+    wsConnected && wsData && Array.isArray(wsData.running_jobs)
+      ? wsData.running_jobs
+      : jobs.filter((j) => j.status === 'running')
+
+  // Merge live WebSocket progress into the queue table (REST data is only a snapshot).
+  const displayJobs = useMemo(() => {
+    if (!wsConnected || !wsData || !Array.isArray(wsData.running_jobs)) return jobs
+    const live = new Map(wsData.running_jobs.map((j) => [j.id, j]))
+    return jobs.map((job) => {
+      const l = live.get(job.id)
+      return l
+        ? {
+            ...job,
+            status: l.status as Job['status'],
+            progress: l.progress,
+            speed: l.speed,
+            estimated_time: l.estimated_time
+          }
+        : job
+    })
+  }, [jobs, wsConnected, wsData])
+
+  // Reload the REST list whenever a job starts or finishes (set of running jobs changes).
+  const wsRunning = wsData?.running_jobs
+  const runningIdsKey = Array.isArray(wsRunning)
+    ? wsRunning
+        .map((j) => j.id)
+        .sort()
+        .join(',')
+    : ''
+  useEffect(() => {
+    if (wsConnected) fetchJobs()
+  }, [runningIdsKey, wsConnected])
 
   // Handle Quick Enqueue
   const handleEnqueue = async (e: React.FormEvent) => {
@@ -594,7 +633,7 @@ export const Processing: React.FC = () => {
               ) : (
                 <Card className="h-[400px]">
                   <TableVirtuoso
-                    data={jobs}
+                    data={displayJobs}
                     className="h-full w-full custom-scrollbar"
                     components={{
                       Table: (props) => (

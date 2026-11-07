@@ -291,7 +291,7 @@ export const ExportProfiles: React.FC = () => {
                       {profile.name}
                     </h3>
                     <p className="text-xs text-gray-500 font-mono mt-2">
-                      {profile.resolution} • {profile.fps}fps • {profile.format.toUpperCase()}
+                      {profile.resolution} • {profile.fps}fps • {(profile.format ?? 'mp4').toUpperCase()}
                     </p>
                     <p className="text-xs text-gray-500 font-mono">
                       {profile.video_codec} • {profile.video_bitrate}

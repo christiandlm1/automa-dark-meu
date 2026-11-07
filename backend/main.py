@@ -92,7 +92,7 @@ async def hardware_monitor_task() -> None:
                     snapshot = await hw_service.get_realtime_snapshot()
                     message = {
                         "type": "hardware_telemetry",
-                        "data": snapshot.model_dump(),
+                        "data": snapshot.model_dump(mode="json"),
                     }
                     await ws_manager.broadcast(message)
                 except Exception as e:

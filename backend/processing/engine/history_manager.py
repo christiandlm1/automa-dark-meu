@@ -19,6 +19,13 @@ from utils.event_bus import event_bus, EVENT_JOB_FINISHED, EVENT_JOB_FAILED
 logger = logging.getLogger("automa.processing.engine.history")
 
 
+def _naive(dt: datetime) -> datetime:
+    """Drop tzinfo (converting to UTC first) so naive DB values and aware ones can be subtracted."""
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 class HistoryManager:
     """Listens to queue events and logs job results to the persistent history table."""
 
@@ -55,7 +62,7 @@ class HistoryManager:
         # Calculate execution time in seconds
         exec_time = 0.0
         if job.started_at and job.finished_at:
-            exec_time = (job.finished_at - job.started_at).total_seconds()
+            exec_time = (_naive(job.finished_at) - _naive(job.started_at)).total_seconds()
             
         async with async_session_maker() as session:
             try:
@@ -93,7 +100,7 @@ class HistoryManager:
         
         exec_time = 0.0
         if job.started_at and job.finished_at:
-            exec_time = (job.finished_at - job.started_at).total_seconds()
+            exec_time = (_naive(job.finished_at) - _naive(job.started_at)).total_seconds()
             
         async with async_session_maker() as session:
             try:

@@ -67,7 +67,7 @@ def _extract_safe(zipf: zipfile.ZipFile, item: str, extract_dir: Path) -> Path:
     return target_path
 
 
-def import_template_from_file(
+async def import_template_from_file(
     file_path: Path,
     db: Optional[AsyncSession] = None
 ) -> dict:
@@ -76,14 +76,33 @@ def import_template_from_file(
     If the package contains bundled assets and a db session is provided,
     they are registered and the asset IDs in the pipeline are remapped.
     """
-    if not file_path.exists() or not zipfile.is_zipfile(file_path):
-        raise ValueError("Invalid template file")
+    if not file_path.exists():
+        raise ValueError("Template file not found")
+
+    if not zipfile.is_zipfile(file_path):
+        # Fallback: accept a plain JSON template (same content as template.json).
+        try:
+            template_data = json.loads(file_path.read_text(encoding="utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ValueError(
+                "Invalid template file: expected a .automa_template exported by AUTOMA "
+                "(ZIP) or a JSON template"
+            )
+        if not isinstance(template_data, dict):
+            raise ValueError("Invalid template file: JSON root must be an object")
+        template_data.setdefault("pipeline_config", [])
+        return template_data
 
     with zipfile.ZipFile(file_path, 'r') as zipf:
-        if "template.json" not in zipf.namelist():
+        # Accept template.json at the root or inside a single folder (re-zipped packages).
+        json_name = next(
+            (n for n in zipf.namelist() if n.replace("\\", "/").split("/")[-1] == "template.json"),
+            None,
+        )
+        if json_name is None:
             raise ValueError("No template.json found in package")
 
-        with zipf.open("template.json") as f:
+        with zipf.open(json_name) as f:
             template_data = json.load(f)
 
         bundled_assets = [item for item in zipf.namelist() if item.startswith("assets/")]
@@ -114,15 +133,18 @@ def import_template_from_file(
 
                         # Find the extracted file
                         asset_file = next(
-                            (extract_dir / "assets" / item.split("/")[-1])
-                            for item in bundled_assets
-                            if old_asset_id in item
-                        ), None)
+                            (
+                                extract_dir / "assets" / item.split("/")[-1]
+                                for item in bundled_assets
+                                if old_asset_id in item
+                            ),
+                            None,
+                        )
                         if not asset_file or not asset_file.exists():
                             continue
 
                         # Register the asset
-                        new_asset_id, _ = _register_asset(db, asset_file, old_asset_id)
+                        new_asset_id, _ = await _register_asset(db, asset_file, old_asset_id)
                         old_to_new[old_asset_id] = new_asset_id
 
                 # Update pipeline references

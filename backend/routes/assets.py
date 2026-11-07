@@ -1,5 +1,7 @@
 from typing import List, Optional
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -75,6 +77,19 @@ async def upload_assets(
     
     await db.commit()
     return uploaded_assets
+
+@router.get("/{asset_id}/file")
+async def get_asset_file(asset_id: str, db: AsyncSession = Depends(get_db)):
+    """Serve the stored file of an asset (used for image previews in the UI)."""
+    result = await db.execute(select(Asset).where(Asset.id == asset_id))
+    asset = result.scalar_one_or_none()
+    if not asset or not asset.file_path:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    path = Path(asset.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Asset file missing on disk")
+    return FileResponse(path, media_type=asset.mime_type or None)
+
 
 @router.delete("/{asset_id}")
 async def delete_asset(asset_id: str, db: AsyncSession = Depends(get_db)):

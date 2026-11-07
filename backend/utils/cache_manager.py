@@ -7,6 +7,7 @@ Saves redundant processing by checking existing files inside settings.CACHE_DIR.
 
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
@@ -24,7 +25,7 @@ class CacheManager:
 
     def _ensure_subdirs(self) -> None:
         """Create cache namespace subdirectories."""
-        for subdir in ["metadata", "thumbnails", "previews", "temp"]:
+        for subdir in ["metadata", "thumbnails", "previews", "renders", "temp"]:
             (self.cache_dir / subdir).mkdir(parents=True, exist_ok=True)
 
     def get_metadata(self, file_hash: str) -> dict | None:
@@ -84,6 +85,33 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Failed to cache preview for {file_hash}: {e}")
             return None
+
+    def _render_entry(self, key: str) -> Path:
+        """Path of the cache entry for a render key (key is sanitized: no path traversal)."""
+        safe_key = re.sub(r"[^A-Za-z0-9_.-]", "_", key)
+        return self.cache_dir / "renders" / f"{safe_key}.txt"
+
+    def get(self, key: str) -> str | None:
+        """Return the cached value (path of a finished render) for a key, or None."""
+        entry = self._render_entry(key)
+        try:
+            if entry.exists():
+                return entry.read_text(encoding="utf-8").strip() or None
+        except Exception as e:
+            logger.error(f"Failed to read render cache entry {key}: {e}")
+        return None
+
+    def set(self, key: str, value: str) -> None:
+        """Remember the path of a finished render under a key.
+
+        A cache failure must never fail the job that produced the render.
+        """
+        try:
+            entry = self._render_entry(key)
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            entry.write_text(value, encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to write render cache entry {key}: {e}")
 
     def clear(self) -> None:
         """Clear all cached files."""

@@ -171,6 +171,7 @@ class FFmpegPlugin(VideoProcessorPlugin, AudioProcessorPlugin):
             
         fps = 0.0
         speed = 1.0
+        ffmpeg_tail: list = []  # last non-progress output lines (the real error message)
         
         try:
             while True:
@@ -180,6 +181,13 @@ class FFmpegPlugin(VideoProcessorPlugin, AudioProcessorPlugin):
                     
                 line_str = line.decode("utf-8", errors="ignore").strip()
                 
+                if line_str and not any(
+                    line_str.startswith(k)
+                    for k in ("frame=", "fps=", "stream_", "bitrate=", "total_size=", "out_time", "dup_frames=", "drop_frames=", "speed=", "progress=")
+                ):
+                    ffmpeg_tail.append(line_str)
+                    del ffmpeg_tail[:-25]
+                    
                 # Check for progress data key-value pairs
                 if "=" in line_str:
                     key, value = line_str.split("=", 1)
@@ -221,6 +229,8 @@ class FFmpegPlugin(VideoProcessorPlugin, AudioProcessorPlugin):
             raise
             
         if process.returncode != 0:
-            raise RuntimeError(f"FFmpeg process terminated with error code {process.returncode}")
+            details = "\n".join(ffmpeg_tail[-15:])
+            logger.error(f"FFmpeg failed (code {process.returncode}):\n{details}")
+            raise RuntimeError(f"FFmpeg process terminated with error code {process.returncode}: {details[-600:]}")
             
         return output_path

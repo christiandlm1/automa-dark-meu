@@ -29,8 +29,13 @@ class BaseRepository(Generic[ModelT]):
 
     # --- Create ---
 
-    async def create(self, entity: ModelT) -> ModelT:
-        """Add a new entity and flush to obtain defaults."""
+    async def create(self, entity: "ModelT | dict") -> ModelT:
+        """Add a new entity and flush to obtain defaults.
+
+        Accepts either a model instance or a dict of column values.
+        """
+        if isinstance(entity, dict):
+            entity = self.model(**entity)
         self.session.add(entity)
         await self.session.flush()
         await self.session.refresh(entity)

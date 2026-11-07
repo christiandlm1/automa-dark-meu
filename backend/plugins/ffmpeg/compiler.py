@@ -51,7 +51,8 @@ class FFmpegCompiler:
                 y = config.get("y", 0)
                 w = config.get("width", 1280)
                 h = config.get("height", 720)
-                vf_filters.append(f"crop={w}:{h}:{x}:{y}")
+                # min(...) keeps the crop inside the real video size (a 1280x720 crop on a smaller video makes FFmpeg fail)
+                vf_filters.append(f"crop=min({w}\\,iw):min({h}\\,ih):{x}:{y}")
                 
             elif node_type == "resize":
                 w = config.get("width", 1280)
@@ -169,7 +170,7 @@ class FFmpegCompiler:
                 output_args.extend(["-b:v", f"{bitrate}k"])
                 
             elif node_type == "codec":
-                codec = config.get("codec", "h264").lower()
+                codec = str(config.get("codec") or "h264").lower()
                 if codec == "h264":
                     video_codec = "libx264"
                 elif codec == "hevc":
@@ -207,7 +208,7 @@ class FFmpegCompiler:
                 if fps:
                     output_args.extend(["-r", str(fps)])
                     
-                codec = config.get("codec", "h264").lower()
+                codec = str(config.get("codec") or "h264").lower()
                 if codec == "h264":
                     video_codec = "libx264"
                 elif codec == "hevc":

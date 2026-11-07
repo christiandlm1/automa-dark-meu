@@ -324,7 +324,7 @@ export const Templates: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <input type="file" id="import-template" accept=".automa_template" className="hidden" onChange={handleImport} />
+          <input type="file" id="import-template" accept=".automa_template,.json,.zip" className="hidden" onChange={handleImport} />
           <Button
             variant="secondary"
             className="flex items-center gap-2 text-xs font-mono"
