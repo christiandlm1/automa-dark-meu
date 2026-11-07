@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { startPythonBackend, stopPythonBackend } from './python'
+import { startPythonBackend, stopPythonBackend, waitForBackend } from './python'
 
 function createWindow(): void {
   // Create the browser window.
@@ -39,7 +39,7 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.automa')
 
@@ -66,6 +66,11 @@ app.whenReady().then(() => {
 
   // Start local Python FastAPI backend
   startPythonBackend()
+
+  const backendReady = await waitForBackend()
+  if (!backendReady) {
+    console.error('[Main] Backend did not become healthy within 30s; opening the window anyway.')
+  }
 
   createWindow()
 

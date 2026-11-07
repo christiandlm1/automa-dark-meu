@@ -20,7 +20,10 @@ build/
 # Database & Runtime storage
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 .cache/
+cache/
 storage/
 temp/
 logs/

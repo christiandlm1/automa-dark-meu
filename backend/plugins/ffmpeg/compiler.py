@@ -6,7 +6,7 @@ Implements complete separation of concerns: Nodes describe, Compiler translates.
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("automa.plugins.ffmpeg.compiler")
 

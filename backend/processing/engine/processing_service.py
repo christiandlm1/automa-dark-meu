@@ -11,6 +11,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Dict, List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 import psutil
 
 from database import async_session_maker

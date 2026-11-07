@@ -9,6 +9,24 @@ export function getBackendUrl(): string {
   return `http://127.0.0.1:${BACKEND_PORT}`
 }
 
+/**
+ * Polls GET /health until the backend answers, so the window is only opened once the
+ * API can serve requests. Resolves true when healthy, false if the timeout is reached.
+ */
+export async function waitForBackend(timeoutMs = 30000, intervalMs = 300): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${getBackendUrl()}/health`, { signal: AbortSignal.timeout(1000) })
+      if (res.ok) return true
+    } catch {
+      // Backend is not accepting connections yet; retry below.
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return false
+}
+
 export function startPythonBackend(): void {
   const isDev = !app.isPackaged
   let executablePath = 'python'

@@ -27,6 +27,8 @@ xxhash>=3.5.0
 
 # Async file operations
 aiofiles>=24.1.0
+imageio-ffmpeg>=0.5.1
+python-multipart>=0.0.9
 
 # WebSocket support (included in uvicorn[standard])
 websockets>=14.0

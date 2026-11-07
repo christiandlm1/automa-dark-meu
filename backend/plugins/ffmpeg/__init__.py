@@ -12,7 +12,7 @@ import re
 import shutil
 import os
 from pathlib import Path
-from typing import Any, Callable, Coroutine, List, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 import imageio_ffmpeg
 from plugins.base import VideoProcessorPlugin, AudioProcessorPlugin

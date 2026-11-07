@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
+settings.ensure_directories()
 from database import init_db, close_db, get_db
 from routes import api_router
 from services.hardware_service import HardwareService
