@@ -80,11 +80,17 @@ export function useWebSocket<T>(path: string) {
       if (socket) {
         // Detach every handler so closing a half-open socket (React StrictMode / route
         // changes) does not log fake errors or trigger a reconnect.
-        socket.onopen = null
         socket.onmessage = null
         socket.onerror = null
         socket.onclose = null
-        socket.close()
+        if (socket.readyState === WebSocket.CONNECTING) {
+          // Closing a socket that is still connecting makes the browser print
+          // "closed before the connection is established"; wait until it opens instead.
+          socket.onopen = () => socket.close()
+        } else {
+          socket.onopen = null
+          socket.close()
+        }
         socketRef.current = null
       }
     }

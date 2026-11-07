@@ -6,6 +6,8 @@ Delegates request/response translation for processing queue and jobs operations.
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+import hashlib
+import json
 from pathlib import Path
 
 from config import settings
@@ -151,7 +153,11 @@ class JobController:
         previews_dir = settings.CACHE_DIR / "previews"
         previews_dir.mkdir(parents=True, exist_ok=True)
         
-        output_filename = f"preview_{data.video_id}_{data.template_id}_{data.start_time:.1f}_{data.end_time:.1f}.mp4"
+        # The template signature keeps a cached preview from being reused after the template changes.
+        signature = hashlib.md5(
+            json.dumps(template.pipeline_config, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()[:8]
+        output_filename = f"preview_{data.video_id}_{data.template_id}_{signature}_{data.start_time:.1f}_{data.end_time:.1f}.mp4"
         output_path = previews_dir / output_filename
         
         # 1. Cache hit check: if the preview file already exists, return URL immediately

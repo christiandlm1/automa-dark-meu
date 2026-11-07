@@ -26,6 +26,7 @@ export const Templates: React.FC = () => {
   // Flat fields
   const [formName, setFormName] = useState('')
   const [formBackground, setFormBackground] = useState('')
+  const [formSmartFit, setFormSmartFit] = useState(true)
   const [formSubtitlePreset, setFormSubtitlePreset] = useState<string>('')
   const [formZoom, setFormZoom] = useState(1.0)
   const [formCrop, setFormCrop] = useState('9:16')
@@ -58,6 +59,7 @@ export const Templates: React.FC = () => {
     setEditingTemplate(null)
     setFormName('')
     setFormBackground('')
+    setFormSmartFit(true)
     setFormSubtitlePreset('')
     setFormZoom(1.0)
     setFormCrop('9:16')
@@ -71,6 +73,7 @@ export const Templates: React.FC = () => {
 
     // Parse from pipeline_config
     let parsedBg = ''
+    let parsedSmartFit = false
     let parsedSub = ''
     let parsedZoom = 1.0
     let parsedCrop = '9:16'
@@ -85,12 +88,14 @@ export const Templates: React.FC = () => {
         parsedMeta = true
       } else if (node.type === 'background') {
         parsedBg = node.config.asset_id || ''
+        parsedSmartFit = !!node.config.smart_fit
       } else if (node.type === 'subtitle') {
         parsedSub = node.config.preset_id || ''
       }
     })
 
     setFormBackground(parsedBg)
+    setFormSmartFit(parsedSmartFit)
     setFormSubtitlePreset(parsedSub)
     setFormZoom(parsedZoom)
     setFormCrop(parsedCrop)
@@ -148,7 +153,10 @@ export const Templates: React.FC = () => {
     ]
 
     if (formBackground) {
-      pipeline_config.push({ type: 'background', config: { asset_id: formBackground } })
+      pipeline_config.push({
+        type: 'background',
+        config: { asset_id: formBackground, ...(formSmartFit ? { smart_fit: true } : {}) }
+      })
     }
 
     if (formSubtitlePreset) {
@@ -232,6 +240,21 @@ export const Templates: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                  {formBackground && (
+                    <label className="flex items-start gap-2 mt-2 text-xs text-gray-300 font-sans cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formSmartFit}
+                        onChange={(e) => setFormSmartFit(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <b className="text-neon-green">Ajuste inteligente do vídeo:</b> remove bordas
+                        pretas/brancas e templates antigos do vídeo e o encaixa, sem distorcer, na área
+                        livre abaixo do texto deste fundo.
+                      </span>
+                    </label>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">

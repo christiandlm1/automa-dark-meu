@@ -13,7 +13,7 @@ import { VideoCard } from '../components/library/VideoCard'
 import { VideoTable } from '../components/library/VideoTable'
 import { Dialog } from '../components/ui/Dialog'
 import { Button } from '../components/ui/Button'
-import { Film, PlayCircle, Zap, Loader2, Sparkles } from 'lucide-react'
+import { Film, PlayCircle, Zap, Loader2, Sparkles, Eye } from 'lucide-react'
 import { VideoTemplate } from '../types/videoTemplate'
 import { ExportProfile } from '../types/exportProfile'
 
@@ -38,6 +38,8 @@ export const Library: React.FC = () => {
   const [exportProfiles, setExportProfiles] = useState<ExportProfile[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedProfileId, setSelectedProfileId] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isPreviewing, setIsPreviewing] = useState(false)
   const [isEnqueuing, setIsEnqueuing] = useState(false)
 
   const handleScanVideo = async (id: string) => {
@@ -77,6 +79,27 @@ export const Library: React.FC = () => {
       setIsBatchModalOpen(true)
     } catch (err) {
       showToast('Falha ao carregar templates ou perfis de exportação', 'error')
+    }
+  }
+
+  const handlePreview = async () => {
+    const sample = filteredVideos[0]
+    if (!sample || !selectedTemplateId) return
+    setIsPreviewing(true)
+    setPreviewUrl(null)
+    try {
+      // Short render (first 4 s) of the first listed video with the chosen template
+      const res = await jobService.preview({
+        video_id: sample.id,
+        template_id: selectedTemplateId,
+        start_time: 0,
+        end_time: 4
+      })
+      setPreviewUrl(res.preview_url)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao gerar prévia', 'error')
+    } finally {
+      setIsPreviewing(false)
     }
   }
 
@@ -270,10 +293,41 @@ export const Library: React.FC = () => {
               </div>
             </div>
 
+            {(previewUrl || isPreviewing) && (
+              <div className="flex justify-center">
+                {isPreviewing ? (
+                  <p className="text-xs font-mono text-gray-400 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Gerando prévia...
+                  </p>
+                ) : (
+                  <video
+                    key={previewUrl ?? ''}
+                    src={previewUrl ?? undefined}
+                    controls
+                    autoPlay
+                    loop
+                    className="max-h-80 rounded border border-cyber-border"
+                  />
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4 border-t border-cyber-border/40">
               <Button
                 variant="secondary"
-                onClick={() => setIsBatchModalOpen(false)}
+                onClick={handlePreview}
+                disabled={isEnqueuing || isPreviewing || !selectedTemplateId || filteredVideos.length === 0}
+                className="flex items-center gap-2"
+              >
+                <Eye className="w-4 h-4" />
+                Prévia
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setPreviewUrl(null)
+                  setIsBatchModalOpen(false)
+                }}
                 disabled={isEnqueuing}
               >
                 Cancelar

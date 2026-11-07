@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any, Dict
@@ -37,5 +38,54 @@ class BackgroundNode(BaseNode):
         config.setdefault("width", int(w))
         config.setdefault("height", int(h))
 
-        context["nodes"].append({"type": self.node_type, "config": config})
+        node_config = config
+        if config.get("smart_fit"):
+            node_config = await self._smart_fit(input_path, config, context)
+
+        context["nodes"].append({"type": self.node_type, "config": node_config})
         return input_path
+
+    async def _smart_fit(self, input_path: Path, config: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Detect the useful region of the video (removing baked-in bars/templates) and the free
+        area reserved by the template, so the compiler can fit the video proportionally inside it.
+        Falls back to fitting the whole frame (no crop) when detection is not reliable.
+        """
+        from processing.analysis.smart_fit import analyze_video, detect_template_area, map_area_to_canvas
+
+        node_config = dict(config)  # do not mutate the template stored in the database
+        canvas_w, canvas_h = int(config["width"]), int(config["height"])
+
+        manual = config.get("video_area")  # optional, already in canvas pixels
+        area_px = None
+        if manual:
+            area_px = {k: int(manual[k]) for k in ("x", "y", "width", "height")}
+        elif config.get("asset_path"):
+            detected = await asyncio.to_thread(
+                detect_template_area,
+                Path(config["asset_path"]),
+                int(config.get("area_margin_top", 40)),
+                int(config.get("area_margin_bottom", 0)),
+                int(config.get("area_margin_side", 0)),
+            )
+            if detected:
+                area_px = map_area_to_canvas(detected, canvas_w, canvas_h)
+        if not area_px or area_px["width"] < 16 or area_px["height"] < 16:
+            area_px = {"x": 0, "y": 0, "width": canvas_w, "height": canvas_h}
+        node_config["video_area_px"] = area_px
+
+        # Generic aspect-ratio crops (no coordinates) would cut the footage blindly: smart fit replaces them.
+        context["nodes"][:] = [
+            n for n in context["nodes"]
+            if not (n.get("type") == "crop" and "width" not in n.get("config", {}) and "aspect_ratio" in n.get("config", {}))
+        ]
+
+        source = Path(context.get("input_path", input_path))
+        analysis = await asyncio.to_thread(analyze_video, source, float(context.get("video_duration", 0.0)))
+        context["smart_fit"] = analysis.to_dict()
+        if analysis.crop:
+            x, y, w, h = analysis.crop
+            # first node: crop the raw footage before subtitles/filters, then fit into the area
+            context["nodes"].insert(0, {"type": "crop", "config": {"x": x, "y": y, "width": w, "height": h}})
+        logger.info(f"[BackgroundNode] Smart fit: {analysis.to_dict()} area={area_px}")
+        return node_config

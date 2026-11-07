@@ -36,6 +36,8 @@ class FFmpegCompiler:
         # Pre-process background node as it forces a complex filter
         bg_node = next((n for n in nodes if n.get("type") == "background"), None)
         has_background = bg_node is not None
+        # Smart fit: the template reserves a rectangle (canvas pixels) for the video.
+        video_area = bg_node.get("config", {}).get("video_area_px") if has_background else None
         if has_background:
             bg_path = bg_node.get("config", {}).get("asset_path")
             if bg_path:
@@ -51,8 +53,7 @@ class FFmpegCompiler:
                 y = config.get("y", 0)
                 w = config.get("width", 1280)
                 h = config.get("height", 720)
-                # min(...) keeps the crop inside the real video size (a 1280x720 crop on a smaller video makes FFmpeg fail)
-                vf_filters.append(f"crop=min({w}\\,iw):min({h}\\,ih):{x}:{y}")
+                vf_filters.append(f"crop={w}:{h}:{x}:{y}")
                 
             elif node_type == "resize":
                 w = config.get("width", 1280)
@@ -170,7 +171,7 @@ class FFmpegCompiler:
                 output_args.extend(["-b:v", f"{bitrate}k"])
                 
             elif node_type == "codec":
-                codec = str(config.get("codec") or "h264").lower()
+                codec = config.get("codec", "h264").lower()
                 if codec == "h264":
                     video_codec = "libx264"
                 elif codec == "hevc":
@@ -200,7 +201,7 @@ class FFmpegCompiler:
             # --- Export configuration node ---
             elif node_type == "export":
                 res = config.get("resolution")
-                if res:
+                if res and not video_area:
                     w, h = res.split("x")
                     vf_filters.append(f"scale={w}:{h}")
                     
@@ -208,7 +209,7 @@ class FFmpegCompiler:
                 if fps:
                     output_args.extend(["-r", str(fps)])
                     
-                codec = str(config.get("codec") or "h264").lower()
+                codec = config.get("codec", "h264").lower()
                 if codec == "h264":
                     video_codec = "libx264"
                 elif codec == "hevc":
@@ -246,12 +247,35 @@ class FFmpegCompiler:
             # scale background [1:v]
             bg_scale = f"[1:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}[bg];"
             
-            # apply standard video filters to the foreground [0:v]
-            fg_chain = ",".join(vf_filters) if vf_filters else "copy"
-            fg_scale = f"[0:v]{fg_chain}[fg];"
-            
-            # overlay fg on bg
-            overlay = f"[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,format=yuv420p[v]"
+            if video_area:
+                # Fit the (already cropped) video proportionally inside the reserved area,
+                # centered horizontally and vertically, never stretching or overflowing it.
+                ax, ay = int(video_area["x"]), int(video_area["y"])
+                aw, ah = int(video_area["width"]), int(video_area["height"])
+                bg_path_cfg = str(bg_config.get("asset_path") or "").lower()
+                is_still = bg_path_cfg.endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
+                loop = "loop=loop=-1:size=1," if is_still else ""
+                bg_scale = (
+                    f"[1:v]{loop}scale={w}:{h}:force_original_aspect_ratio=increase,"
+                    f"crop={w}:{h},setsar=1[bg];"
+                )
+                fit = (
+                    f"scale={aw}:{ah}:force_original_aspect_ratio=decrease:flags=lanczos,"
+                    f"scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1"
+                )
+                fg_chain = ",".join(vf_filters + [fit])
+                fg_scale = f"[0:v]{fg_chain}[fg];"
+                overlay = (
+                    f"[bg][fg]overlay=x={ax}+({aw}-w)/2:y={ay}+({ah}-h)/2:"
+                    f"shortest=1:format=auto,format=yuv420p[v]"
+                )
+            else:
+                # apply standard video filters to the foreground [0:v]
+                fg_chain = ",".join(vf_filters) if vf_filters else "copy"
+                fg_scale = f"[0:v]{fg_chain}[fg];"
+                
+                # overlay fg on bg
+                overlay = f"[bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,format=yuv420p[v]"
             
             complex_filter = bg_scale + fg_scale + overlay
             output_args.extend(["-map", "[v]", "-map", "0:a?"])
