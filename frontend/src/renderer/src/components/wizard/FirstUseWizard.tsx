@@ -19,7 +19,7 @@ export function FirstUseWizard({ onComplete }: FirstUseWizardProps) {
 
   useEffect(() => {
     // Basic hardware fetch just to show something cool
-    api.get<any>('/hardware/snapshot').then(res => setHardware(res?.data || res)).catch(() => {})
+    api.get<any>('/hardware/realtime').then(res => setHardware(res?.data || res)).catch(() => {})
   }, [])
 
   const finishWizard = async () => {
@@ -92,13 +92,13 @@ export function FirstUseWizard({ onComplete }: FirstUseWizardProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400">RAM:</span>
                   <span className="font-mono text-zinc-200">
-                    {hardware ? `${(hardware.ram_used / 1e9).toFixed(1)}GB / ${(hardware.ram_total / 1e9).toFixed(1)}GB` : 'Detectando...'}
+                    {hardware ? `${Number(hardware.ram_used_gb).toFixed(1)}GB / ${Number(hardware.ram_total_gb).toFixed(1)}GB` : 'Detectando...'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400">Aceleração GPU:</span>
                   <span className="font-mono text-emerald-400 font-medium">
-                    {hardware?.gpus?.length ? 'Disponível' : 'Não Detectada'}
+                    {hardware?.gpu_load_percent != null ? 'Disponível' : 'Não Detectada'}
                   </span>
                 </div>
               </div>

@@ -120,13 +120,17 @@ export const Templates: React.FC = () => {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      await api.post('/video-templates/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      // Do not set Content-Type here: the browser must add the multipart boundary itself,
+      // otherwise the backend cannot parse the upload and answers 400.
+      await api.post('/video-templates/import', formData)
       showToast('Template importado com sucesso!', 'success')
       fetchTemplates()
     } catch (err) {
-      showToast('Falha ao importar template', 'error')
+      const reason = err instanceof Error && err.message ? `: ${err.message}` : ''
+      showToast(`Falha ao importar template${reason}`, 'error')
+    } finally {
+      // Allow selecting the same file again after a failure.
+      e.target.value = ''
     }
   }
 

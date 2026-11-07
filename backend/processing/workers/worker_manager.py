@@ -51,6 +51,9 @@ class WorkerManager:
 
     def apply_process_priority(self, level: str) -> None:
         """Apply OS-level process scheduling priority using psutil."""
+        if getattr(self, "_applied_priority", None) == level:
+            return
+        self._applied_priority = level
         self.priority = level
         try:
             p = psutil.Process()

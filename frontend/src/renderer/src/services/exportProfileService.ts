@@ -3,8 +3,9 @@ import { ExportProfile, ExportProfileCreate, ExportProfileUpdate } from '../type
 
 export const exportProfileService = {
   getAll: async (): Promise<ExportProfile[]> => {
-    const response = await api.get<ExportProfile[]>('/export-profiles/')
-    return response
+    // The backend wraps the list as { profiles, total }; every caller expects a plain array.
+    const response = await api.get<{ profiles: ExportProfile[]; total: number }>('/export-profiles')
+    return response.profiles
   },
 
   getById: async (id: string): Promise<ExportProfile> => {
@@ -13,7 +14,7 @@ export const exportProfileService = {
   },
 
   create: async (data: ExportProfileCreate): Promise<ExportProfile> => {
-    const response = await api.post<ExportProfile>('/export-profiles/', data)
+    const response = await api.post<ExportProfile>('/export-profiles', data)
     return response
   },
 

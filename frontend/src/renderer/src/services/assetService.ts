@@ -21,7 +21,7 @@ export const assetService = {
     if (type) params.append('type', type)
     if (category) params.append('category', category)
 
-    return api.get<Asset[]>(`/assets?${params.toString()}`)
+    return api.get<Asset[]>(`/assets/?${params.toString()}`)
   },
 
   uploadAssets: async (

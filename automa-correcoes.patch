@@ -1,0 +1,82 @@
+diff --git a/.gitignore b/.gitignore
+index 919f1a1..00ba57f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -20,6 +20,8 @@ build/
+ # Database & Runtime storage
+ *.db
+ *.db-journal
++*.db-wal
++*.db-shm
+ .cache/
+ storage/
+ temp/
+diff --git a/backend/main.py b/backend/main.py
+index 2fb3a2a..ea2deda 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -13,6 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
+ from fastapi.staticfiles import StaticFiles
+ 
+ from config import settings
++
++# Create runtime folders BEFORE anything else touches them. The log FileHandler and
++# the StaticFiles mounts below run at import time, so waiting for the lifespan hook
++# crashes the backend on a fresh checkout (no logs/, thumbnails/ or cache/ yet).
++settings.ensure_directories()
++
+ from database import init_db, close_db, get_db
+ from routes import api_router
+ from services.hardware_service import HardwareService
+diff --git a/backend/plugins/ffmpeg/__init__.py b/backend/plugins/ffmpeg/__init__.py
+index b1464d8..c682457 100644
+--- a/backend/plugins/ffmpeg/__init__.py
++++ b/backend/plugins/ffmpeg/__init__.py
+@@ -12,7 +12,7 @@ import re
+ import shutil
+ import os
+ from pathlib import Path
+-from typing import Any, Callable, Coroutine, List, Optional
++from typing import Any, Callable, Coroutine, Dict, List, Optional
+ 
+ import imageio_ffmpeg
+ from plugins.base import VideoProcessorPlugin, AudioProcessorPlugin
+diff --git a/backend/plugins/ffmpeg/compiler.py b/backend/plugins/ffmpeg/compiler.py
+index 11c95c3..8f1b374 100644
+--- a/backend/plugins/ffmpeg/compiler.py
++++ b/backend/plugins/ffmpeg/compiler.py
+@@ -6,7 +6,7 @@ Implements complete separation of concerns: Nodes describe, Compiler translates.
+ """
+ 
+ import logging
+-from typing import Any, Dict, List, Tuple
++from typing import Any, Dict, List, Optional, Tuple
+ 
+ logger = logging.getLogger("automa.plugins.ffmpeg.compiler")
+ 
+diff --git a/backend/processing/engine/processing_service.py b/backend/processing/engine/processing_service.py
+index a901e19..b047293 100644
+--- a/backend/processing/engine/processing_service.py
++++ b/backend/processing/engine/processing_service.py
+@@ -12,6 +12,7 @@ import time
+ from pathlib import Path
+ from typing import Any, Callable, Coroutine, Dict, List, Optional
+ import psutil
++from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from database import async_session_maker
+ from models.job import Job
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 95d0b23..bedf57f 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -9,6 +9,9 @@ pydantic-settings>=2.7.0
+ sqlalchemy[asyncio]>=2.0.36
+ aiosqlite>=0.20.0
+ 
++# FFmpeg static binary (used by plugins/ffmpeg via imageio_ffmpeg.get_ffmpeg_exe())
++imageio-ffmpeg>=0.5.1
++
+ # Video metadata (NOT FFmpeg)
+ pymediainfo>=6.1.0
+ 

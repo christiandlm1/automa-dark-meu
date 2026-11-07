@@ -100,6 +100,20 @@ async def restore_template_version(
     return await controller.restore_version(template_id, version)
 
 
+from typing import Dict
+from database import get_db, async_session_maker
+from controllers.video_template_controller import VideoTemplateController
+from repositories.asset_repository import AssetRepository
+from schemas.video_template import (
+    VideoTemplateCreate,
+    VideoTemplateResponse,
+    VideoTemplateUpdate,
+    VideoTemplateListResponse,
+)
+
+router = APIRouter(prefix="/video-templates", tags=["templates"])
+
+
 @router.get("/{template_id}/export")
 async def export_template(
     template_id: str,
@@ -114,8 +128,19 @@ async def export_template(
         "category": template.category,
         "pipeline_config": template.pipeline_config
     }
-    
-    file_path = export_template_to_file(template_data)
+
+    # Gather assets
+    assets: Dict[str, str] = {}
+    asset_repo = AssetRepository(db)
+    for node in template.pipeline_config:
+        if node.get("type") == "background":
+            asset_id = node["config"].get("asset_id")
+            if asset_id:
+                asset = await asset_repo.get(asset_id)
+                if asset and asset.file_path:
+                    assets[asset_id] = asset.file_path
+
+    file_path = export_template_to_file(template_data, assets)
     return FileResponse(path=file_path, media_type='application/octet-stream', filename=file_path.name)
 
 @router.post("/import", response_model=VideoTemplateResponse)
@@ -132,7 +157,7 @@ async def import_template(
         with open(temp_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        template_data = import_template_from_file(temp_file)
+        template_data = import_template_from_file(temp_file, db=db)
         
         create_data = VideoTemplateCreate(
             name=f"{template_data.get('name', 'Imported')} (Imported)",

@@ -44,6 +44,7 @@ async def create_profile(
     return await controller.create_profile(data)
 
 
+@router.put("/{profile_id}", response_model=ExportProfileResponse)
 @router.patch("/{profile_id}", response_model=ExportProfileResponse)
 async def update_profile(
     profile_id: str, data: ExportProfileUpdate, session: AsyncSession = Depends(get_db)
