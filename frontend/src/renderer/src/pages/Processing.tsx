@@ -345,7 +345,7 @@ export const Processing: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col min-h-0 select-none">
+    <div className="space-y-3 h-full flex flex-col min-h-0 select-none">
       {/* Header Banner */}
       <div className="flex justify-between items-center shrink-0">
         <div>
@@ -513,14 +513,14 @@ export const Processing: React.FC = () => {
       {/* Dynamic Content Panel */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {activeTab === 'queue' ? (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Worker Monitor - Card Row */}
-            <div className="space-y-4">
+            <div className="space-y-2">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
                 Monitor de Workers (Threads de Renderização)
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {Array.from({ length: maxWorkers }).map((_, idx) => {
                   const workerIndex = idx
                   const activeJob = runningJobsList[workerIndex]
@@ -528,7 +528,7 @@ export const Processing: React.FC = () => {
                   return (
                     <Card
                       key={workerIndex}
-                      className={`p-4 border ${
+                      className={`p-3 border ${
                         activeJob
                           ? activeJob.status === 'paused'
                             ? 'border-yellow-500/30 bg-yellow-500/5'
@@ -536,7 +536,7 @@ export const Processing: React.FC = () => {
                           : 'border-cyber-border/40 bg-cyber-bg/10'
                       }`}
                     >
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold font-mono text-white">
                           Worker #{workerIndex + 1}
                         </span>
@@ -558,7 +558,7 @@ export const Processing: React.FC = () => {
                       </div>
 
                       {activeJob ? (
-                        <div className="space-y-3 font-mono text-xs text-gray-400">
+                        <div className="space-y-2 font-mono text-xs text-gray-400">
                           <div className="truncate">
                             <span className="text-gray-500">Vídeo:</span>{' '}
                             <strong className="text-white">
@@ -620,7 +620,7 @@ export const Processing: React.FC = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="h-24 flex items-center justify-center text-xs font-mono text-gray-600">
+                        <div className="h-12 flex items-center justify-center text-xs font-mono text-gray-600">
                           Aguardando distribuição de jobs...
                         </div>
                       )}
@@ -631,7 +631,7 @@ export const Processing: React.FC = () => {
             </div>
 
             {/* General Queue Table */}
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
                   Fila de Processamento
@@ -655,7 +655,7 @@ export const Processing: React.FC = () => {
                   <p className="text-sm text-gray-400">Nenhum job na fila do projeto.</p>
                 </div>
               ) : (
-                <Card className="h-[400px]">
+                <Card className="h-[calc(100vh-300px)] min-h-[420px]">
                   <TableVirtuoso
                     data={displayJobs}
                     className="h-full w-full custom-scrollbar"
@@ -806,7 +806,7 @@ export const Processing: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <Card className="h-[400px]">
+              <Card className="h-[calc(100vh-300px)] min-h-[420px]">
                 <TableVirtuoso
                   data={history}
                   className="h-full w-full custom-scrollbar"
