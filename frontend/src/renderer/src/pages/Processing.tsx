@@ -34,7 +34,8 @@ import {
   AlertTriangle,
   Database,
   CheckSquare,
-  Gauge
+  Gauge,
+  Trash2
 } from 'lucide-react'
 import { formatDuration, formatDate } from '../utils/format'
 import { TableVirtuoso } from 'react-virtuoso'
@@ -313,6 +314,17 @@ export const Processing: React.FC = () => {
     }
   }
 
+  const handleClearQueue = async () => {
+    if (!activeProject || !confirm('Remover todos os itens da fila (exceto o que está processando agora)?')) return
+    try {
+      const result = await jobService.clearQueue(activeProject.id)
+      showToast(`Removidos ${result.removed} jobs da fila.`, 'success')
+      fetchJobs()
+    } catch (err) {
+      showToast('Falha ao limpar fila', 'error')
+    }
+  }
+
   const handleRecoveryAction = async (action: 'continue' | 'restart' | 'cancel') => {
     try {
       for (const job of interruptedJobs) {
@@ -367,54 +379,54 @@ export const Processing: React.FC = () => {
       </div>
 
       {/* Engine Telemetry Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 shrink-0">
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <PlayCircle className="w-8 h-8 text-neon-green" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2 shrink-0">
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <PlayCircle className="w-5 h-5 text-neon-green" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
                 Fila Pendente
               </span>
-              <span className="text-xl font-bold text-white">{queueSize} Vídeos</span>
+              <span className="text-sm font-bold text-white">{queueSize}</span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <Cpu className="w-8 h-8 text-neon-cyan" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-neon-cyan" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
                 Workers Ativos
               </span>
-              <span className="text-xl font-bold text-white">
+              <span className="text-sm font-bold text-white">
                 {activeWorkersCount} / {maxWorkers}
               </span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <Clock className="w-8 h-8 text-neon-pink" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-neon-pink" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
                 Prioridade Motor
               </span>
-              <span className="text-xl font-bold text-white uppercase tracking-wider">
+              <span className="text-sm font-bold text-white uppercase tracking-wider">
                 {processPriority}
               </span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <HardDrive className="w-8 h-8 text-neon-green" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-5 h-5 text-neon-green" />
             <div className="flex-1">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-mono text-gray-500 uppercase">Uso de CPU</span>
-                <span className="text-[10px] font-mono text-white">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-mono text-gray-500 uppercase">Uso CPU</span>
+                <span className="text-[9px] font-mono text-white">
                   {hwData?.cpu_percent || 0}%
                 </span>
               </div>
@@ -423,41 +435,40 @@ export const Processing: React.FC = () => {
           </div>
         </Card>
 
-        {/* Module 08: Health Monitor stats */}
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <CheckSquare className="w-8 h-8 text-neon-green" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-neon-green" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
                 Vídeos Hoje
               </span>
-              <span className="text-xl font-bold text-white">{stats?.processed_today || 0}</span>
+              <span className="text-sm font-bold text-white">{stats?.processed_today || 0}</span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <Gauge className="w-8 h-8 text-neon-cyan" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <Gauge className="w-5 h-5 text-neon-cyan" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
                 Tempo Médio / Vídeo
               </span>
-              <span className="text-xl font-bold text-white">
+              <span className="text-sm font-bold text-white">
                 {stats?.avg_video_time ? `${stats.avg_video_time.toFixed(1)}s` : '-'}
               </span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-cyber-bg/30">
-          <div className="flex items-center gap-3">
-            <Database className="w-8 h-8 text-neon-pink" />
+        <Card className="px-3 py-2 bg-cyber-bg/30">
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-neon-pink" />
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">
-                Cache (Hits / Misses)
+              <span className="text-[9px] font-mono text-gray-500 uppercase block">
+                Cache (H / M)
               </span>
-              <span className="text-xl font-bold text-white">
+              <span className="text-sm font-bold text-white">
                 {stats?.cache_hits || 0} / {stats?.cache_misses || 0}
               </span>
             </div>
@@ -621,9 +632,22 @@ export const Processing: React.FC = () => {
 
             {/* General Queue Table */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
-                Fila de Processamento
-              </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">
+                  Fila de Processamento
+                </h3>
+                {jobs.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="hover:bg-neon-pink/15 text-neon-pink border-neon-pink/20"
+                    onClick={handleClearQueue}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    Limpar fila
+                  </Button>
+                )}
+              </div>
 
               {jobs.length === 0 ? (
                 <div className="border border-dashed border-cyber-border/40 rounded p-12 text-center bg-cyber-bg/10">

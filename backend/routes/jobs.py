@@ -75,6 +75,16 @@ async def resume_job(
     return await controller.resume(job_id)
 
 
+@router.delete("/project/{project_id}/queue")
+async def delete_queue(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove pending/paused/etc jobs from queue."""
+    controller = JobController(db)
+    return await controller.delete_queue(project_id)
+
+
 @router.post("/{job_id}/cancel", response_model=JobResponse)
 async def cancel_job(
     job_id: str,

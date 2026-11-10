@@ -34,6 +34,10 @@ export const jobService = {
     return api.post<Job>(`/jobs/${id}/reprocess`)
   },
 
+  clearQueue: async (projectId: string): Promise<{ removed: number; kept_running: number }> => {
+    return api.delete<{ removed: number; kept_running: number }>(`/jobs/project/${projectId}/queue`)
+  },
+
   preview: async (data: {
     video_id: string
     template_id: string

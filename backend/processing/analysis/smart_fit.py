@@ -34,6 +34,7 @@ logger = logging.getLogger("automa.processing.analysis.smart_fit")
 
 # --- Tunables (gray values are 0..255 on a frame downscaled to ~360 px wide) ---
 SAMPLE_COUNT = 12
+MIN_FRAMES = 6           # fewer sampled frames than this -> try the sequential fallback
 ANALYSIS_WIDTH = 360
 UNIFORM_STD = 2.5        # a row/column is "uniform" (true bar) when its spatial std stays below this
 DARK_MEAN = 30.0         # mean below -> black bar
@@ -51,6 +52,9 @@ MIN_ACTIVITY_FOR_STATIC = 0.05
 ACTIVE_BEYOND = 0.25     # content right after a static strip must be moving across >=25 % of the span
 ALIVE_AFTER = 0.02       # share of the area below a template strip that must show motion (the footage is alive)
 FLAT_STRIP = 0.5         # share of a strip in ONE 8-level tone to count as a flat (template-like) strip
+QUIET_STRIP = 0.01        # share of moving pixels allowed in a template strip (noise tolerance)
+STILL_EDGE = 0.8          # still video: the strip boundary must be a very sharp, full-width edge
+STILL_DOMINANCE = 0.7     # still video: the strip must be mostly ONE flat tone
 BOTTOM_SAFE_RATIO = 0.086  # when the free area reaches the bottom of the template, keep ~8.6 % (165 px of 1920) free
                            # (safe zone for Reels/Shorts buttons and captions; matches the reference example)
 
@@ -141,14 +145,44 @@ def sample_frames(
     full_h, full_w = full.shape[:2]
     del full
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         frames = [f for f in pool.map(lambda t: _grab(path, t, width), times) if f is not None]
+    # all frames must share the same shape
+    if frames:
+        shape = frames[0].shape
+        frames = [f for f in frames if f.shape == shape]
+    if len(frames) < MIN_FRAMES:
+        # some seeks failed (busy CPU, odd container...): read the frames in ONE sequential pass
+        logger.warning("smart fit: só %d quadros por seek; tentando leitura sequencial", len(frames))
+        seq = _sample_sequential(path, full_w, full_h, width, count)
+        if len(seq) > len(frames):
+            frames = seq
     if not frames:
         raise ValueError(f"Não foi possível amostrar frames de {path}")
-    # all frames must share the same shape
-    shape = frames[0].shape
-    frames = [f for f in frames if f.shape == shape]
     return frames, (full_w, full_h)
+
+
+def _sample_sequential(path: Path, full_w: int, full_h: int, width: int, count: int) -> List[np.ndarray]:
+    """Decode the video once, spread `count` frames over it (fallback for failed seeks)."""
+    out_w = width - (width % 2)
+    out_h = max(2, int(round(full_h * out_w / float(full_w) / 2.0)) * 2)
+    size = out_w * out_h * 3
+    duration = _probe_duration(path)
+    fps = (count / duration) if duration > 0.5 else 2.0
+    cmd = [
+        _ffmpeg_exe(), "-v", "error", "-i", str(path),
+        "-vf", f"fps={fps:.4f},scale={out_w}:{out_h}:flags=area",
+        "-frames:v", str(count), "-f", "rawvideo", "-pix_fmt", "bgr24", "pipe:1",
+    ]
+    try:
+        raw = subprocess.run(cmd, capture_output=True, timeout=120, creationflags=_no_window_flags()).stdout
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.warning("smart fit: leitura sequencial falhou: %s", exc)
+        return []
+    n = len(raw) // size
+    return [
+        np.frombuffer(raw, np.uint8, size, i * size).reshape(out_h, out_w, 3).copy() for i in range(n)
+    ]
 
 
 # ----------------------------------------------------------------------------
@@ -210,6 +244,13 @@ def _leading_crop(frames: np.ndarray, allow_static: bool) -> Tuple[int, str]:
         length = 0
         while length < max_p and dead[length]:
             length += 1
+        # A few noisy rows (compression noise on text/logo) must not stop the search: extend the
+        # candidate range while the whole strip above stays almost motionless.
+        quiet = np.cumsum((tstd > TEMPORAL_STD).sum(axis=1)) / (np.arange(1, h + 1) * float(tstd.shape[1]))
+        ext = length
+        while ext < max_p and quiet[ext] < QUIET_STRIP:
+            ext += 1
+        length = max(length, ext)
 
         look = max(3, int(height * 0.03))
         for p in range(length, max(best, 0), -1):
@@ -238,6 +279,17 @@ def _leading_crop(frames: np.ndarray, allow_static: bool) -> Tuple[int, str]:
                     best, reason = p, "template/moldura estática"
                 else:
                     best = max(best, p)
+                break
+    elif len(frames) >= 1:
+        # (almost) no motion in the whole video -> motion cannot tell a template from footage.
+        # Accept only a very clear template strip: mostly ONE flat tone + a sharp full-width edge.
+        min_strip = max(4, int(height * 0.04))
+        for p in range(max_p, max(best, 0) + min_strip - 1, -1):
+            if p + 1 > h or _edge_strength(f, p) < STILL_EDGE:
+                continue
+            tones = (frames[0, :p, :] >> 4).ravel()
+            if np.bincount(tones, minlength=16).max() / tones.size >= STILL_DOMINANCE:
+                best, reason = p, "template/moldura estática (vídeo quase parado)"
                 break
     return best, reason
 
@@ -332,6 +384,9 @@ def analyze_frames(
         result.reasons.append("nenhuma borda/moldura detectada: vídeo mantido inteiro")
         return result
 
+    if t_count < 3:
+        all_reasons.append(f"atenção: só {t_count} quadro(s) analisado(s); modelos estáticos não detectados")
+    all_reasons.append(f"{t_count} quadros analisados")
     rect = (x0, y0, x1, y1)
     if faces is None:
         faces = _detect_faces([gray[i] for i in range(0, t_count, max(1, t_count // 4))])
