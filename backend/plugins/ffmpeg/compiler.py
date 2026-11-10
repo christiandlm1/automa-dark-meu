@@ -48,7 +48,18 @@ class FFmpegCompiler:
             config = node.get("config", {})
             
             # --- Video Filters ---
-            if node_type == "crop":
+            if node_type == "crop" and "width" not in config and config.get("aspect_ratio"):
+                # Aspect-ratio crop (what the Templates screen saves): centered, never larger than the frame
+                try:
+                    a, b = [float(v) for v in str(config["aspect_ratio"]).split(":")]
+                except ValueError:
+                    a = b = 0.0
+                if a > 0 and b > 0:
+                    vf_filters.append(
+                        f"crop=w=trunc(min(iw\\,ih*{a}/{b})/2)*2:h=trunc(min(ih\\,iw*{b}/{a})/2)*2"
+                    )
+
+            elif node_type == "crop":
                 x = config.get("x", 0)
                 y = config.get("y", 0)
                 w = config.get("width", 1280)

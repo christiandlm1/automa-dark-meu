@@ -7,6 +7,7 @@ Decouples job queues from execution policies.
 """
 
 import logging
+import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from processing.jobs.queue_manager import QueueManager
@@ -20,7 +21,7 @@ class Scheduler:
     """Manages queue scheduling, worker distribution and throttle policies."""
 
     def __init__(self) -> None:
-        pass
+        self._last_throttle_log = 0.0
 
     async def schedule_jobs(
         self,
@@ -41,12 +42,17 @@ class Scheduler:
 
         # 2. Check if the system has sufficient resources to run another task
         # If resources are overloaded, we delay executing new jobs to prevent freeze
-        if not resource_manager.has_sufficient_resources(
+        # With no job running, the load comes from other programs, not from AUTOMA: delaying
+        # would block the queue forever, so at least one job is always allowed to start.
+        if active_count > 0 and not resource_manager.has_sufficient_resources(
             max_cpu=worker_manager.max_cpu,
             max_ram=worker_manager.max_ram,
             max_gpu=worker_manager.max_gpu,
         ):
-            logger.warning("Resource limits exceeded. Scheduler is delaying new jobs.")
+            now = time.monotonic()
+            if now - self._last_throttle_log > 30:  # avoid one warning per second
+                logger.warning("Resource limits exceeded. Scheduler is delaying new jobs.")
+                self._last_throttle_log = now
             return
 
         # 3. Pull next pending jobs from queue

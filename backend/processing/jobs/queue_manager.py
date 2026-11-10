@@ -199,9 +199,6 @@ class QueueManager:
             details={"job_id": job.id},
         )
         
-        # Release the write lock before listeners write to the DB (SQLite)
-        await self.session.commit()
-        
         # Publish event as failed (cancelled)
         await event_bus.publish(EVENT_JOB_FAILED, job, "Cancelado pelo usuário.")
         
@@ -229,7 +226,7 @@ class QueueManager:
         
         # Release the write lock before listeners write to the DB (SQLite)
         await self.session.commit()
-        
+
         # Publish event
         await event_bus.publish(EVENT_JOB_FINISHED, job)
         
@@ -256,7 +253,7 @@ class QueueManager:
         
         # Release the write lock before listeners write to the DB (SQLite)
         await self.session.commit()
-        
+
         # Publish event
         await event_bus.publish(EVENT_JOB_FAILED, job, error_message)
         

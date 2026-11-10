@@ -49,6 +49,10 @@ MAX_SIDE_CROP = 0.40     # never remove more than 40 % from one side
 MIN_KEEP_AREA = 0.20     # the kept region must be at least 20 % of the frame
 MIN_ACTIVITY_FOR_STATIC = 0.05
 ACTIVE_BEYOND = 0.25     # content right after a static strip must be moving across >=25 % of the span
+ALIVE_AFTER = 0.02       # share of the area below a template strip that must show motion (the footage is alive)
+FLAT_STRIP = 0.5         # share of a strip in ONE 8-level tone to count as a flat (template-like) strip
+BOTTOM_SAFE_RATIO = 0.086  # when the free area reaches the bottom of the template, keep ~8.6 % (165 px of 1920) free
+                           # (safe zone for Reels/Shorts buttons and captions; matches the reference example)
 
 
 @dataclass
@@ -194,6 +198,7 @@ def _leading_crop(frames: np.ndarray, allow_static: bool) -> Tuple[int, str]:
 
     if allow_static and len(frames) >= 3:
         tstd = f.std(axis=0)
+        tstd_all = frames.astype(np.float32).std(axis=0)  # whole frame, to know if the footage below is alive
         static = (tstd > TEMPORAL_STD).mean(axis=1) < STATIC_ROW_ACTIVITY
         hf = np.mean(
             [np.abs(cv2.Laplacian(f[t], cv2.CV_32F, ksize=3)).mean(axis=1) for t in range(f.shape[0])],
@@ -214,8 +219,15 @@ def _leading_crop(frames: np.ndarray, allow_static: bool) -> Tuple[int, str]:
                 below = tstd[p : p + look, :]
             # the footage that starts at the boundary must be alive (moving), otherwise this
             # may be a static part of the scene (wall, tripod background) and not a template
-            if below.size == 0 or (below > TEMPORAL_STD).mean() < ACTIVE_BEYOND:
-                continue
+            local_alive = below.size > 0 and (below > TEMPORAL_STD).mean() >= ACTIVE_BEYOND
+            if not local_alive:
+                # The footage may start with a still area (wall, sky). Accept the boundary only when
+                # the footage below moves somewhere AND the strip is a flat, template-like one.
+                if (tstd_all[p:, :] > TEMPORAL_STD).mean() < ALIVE_AFTER:
+                    continue
+                strip0 = frames[0, :p, :]
+                if np.bincount((strip0 >> 3).ravel(), minlength=32).max() / strip0.size < FLAT_STRIP:
+                    continue
             if _edge_strength(f, p) < EDGE_FRACTION:
                 continue
             strip = frames[:, :p, :]
@@ -381,7 +393,10 @@ def detect_template_area(
     tolerance: int = 24,
 ) -> Optional[Dict[str, int]]:
     """
-    Find the free area below the last text/graphic of a template image.
+    Find the free area reserved for the video in a template image.
+
+    The area is the largest empty horizontal band between the template's elements
+    (header texts above, optional footer/watermark below).
 
     Returns {"x","y","width","height","image_width","image_height"} in template pixels,
     or None if the file is not a readable still image.
@@ -398,10 +413,30 @@ def detect_template_area(
     bg = np.median(edge, axis=0)
     diff = np.abs(img.astype(np.int16) - bg.astype(np.int16)).max(axis=2)
     rows = np.where((diff > tolerance).sum(axis=1) >= 3)[0]
-    content_bottom = int(rows.max()) + 1 if rows.size else 0
-    top = min(content_bottom + margin_top, h - 16)
+
+    # Group rows with content into blocks; gaps smaller than min_gap belong to the same block
+    # (lines of text, avatar + name...). The video goes into the largest empty gap.
+    min_gap = max(32, int(h * 0.04))
+    if rows.size == 0:
+        gap_start, gap_end = 0, h
+    else:
+        splits = np.where(np.diff(rows) > min_gap)[0]
+        starts = [int(rows[0])] + [int(rows[i + 1]) for i in splits]
+        ends = [int(rows[i]) + 1 for i in splits] + [int(rows[-1]) + 1]
+        gaps = [(0, starts[0])]  # above the first block
+        gaps += [(ends[i], starts[i + 1]) for i in range(len(starts) - 1)]
+        gaps.append((ends[-1], h))  # below the last block
+        gap_start, gap_end = max(gaps, key=lambda g: g[1] - g[0])
+
+    top = gap_start + (margin_top if gap_start > 0 else 0)
+    if gap_end < h:
+        bottom = gap_end - 24  # a footer/watermark follows: stay clear of it
+    else:
+        # margin_bottom == 0 means "automatic" (safe zone at the bottom of the template)
+        bottom = h - (margin_bottom if margin_bottom > 0 else int(round(h * BOTTOM_SAFE_RATIO)))
+    top = min(top, h - 16)
     top += top % 2
-    bottom = max(h - margin_bottom, top + 16)
+    bottom = max(bottom, top + 16)
     height = bottom - top
     height -= height % 2
     side = margin_side - margin_side % 2

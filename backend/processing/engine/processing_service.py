@@ -504,8 +504,14 @@ class ProcessingService:
         
         cache_hits = sum(1 for h in histories if "Cache HIT" in (h.log or ""))
         cache_misses = len(histories) - cache_hits
-        processed_today = sum(1 for h in histories if h.processed_at >= today_start and h.status == "completed")
-        avg_time = sum(h.execution_time for h in histories if h.status == "completed") / max(1, sum(1 for h in histories if h.status == "completed"))
+        def _as_utc(dt):
+            return dt if dt is None or dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+        processed_today = sum(
+            1 for h in histories
+            if h.status == "completed" and h.processed_at and _as_utc(h.processed_at) >= today_start
+        )
+        avg_time = sum((h.execution_time or 0) for h in histories if h.status == "completed") / max(1, sum(1 for h in histories if h.status == "completed"))
         
         active_jobs = [w for w in self.worker_manager.active_workers.keys()]
         

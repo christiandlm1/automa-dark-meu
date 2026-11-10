@@ -218,6 +218,9 @@ async def websocket_processing_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         processing_ws_manager.disconnect(websocket)
+    except RuntimeError:
+        # client left while the initial state was being sent: normal when the UI changes page
+        processing_ws_manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"Processing WebSocket connection error: {e}")
         processing_ws_manager.disconnect(websocket)
