@@ -21,6 +21,7 @@ from utils.file_utils import (
     is_valid_video_extension,
     safe_copy_file,
 )
+from utils.video_utils import strip_video_metadata
 
 
 class VideoService:
@@ -71,6 +72,7 @@ class VideoService:
                     None, safe_copy_file, str(source), dest_path
                 )
                 project_path = dest_path
+                await loop.run_in_executor(None, strip_video_metadata, project_path)
             else:
                 project_path = str(source)
 

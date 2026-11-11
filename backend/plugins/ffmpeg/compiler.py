@@ -248,6 +248,8 @@ class FFmpegCompiler:
                     
         # Apply compiled codecs
         output_args.extend(["-vcodec", video_codec])
+        if video_codec == "libx264" and "-preset" not in output_args:
+            output_args.extend(["-preset", "veryfast"])
         output_args.extend(["-acodec", audio_codec])
         
         # Build complex filter if background exists

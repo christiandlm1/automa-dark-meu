@@ -5,11 +5,14 @@ Extracts video metadata using pymediainfo and provides a typed dataclass.
 CPU-bound — should be called from a thread pool executor.
 """
 
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import cv2
+import imageio_ffmpeg
 from pymediainfo import MediaInfo
 
 
@@ -103,3 +106,60 @@ def extract_video_metadata(file_path: str) -> VideoMetadata:
         meta.resolution = f"{meta.width}x{meta.height}"
 
     return meta
+
+
+def strip_video_metadata(file_path: str) -> bool:
+    """Remove container/stream metadata and chapters from a video via stream copy."""
+    path = Path(file_path)
+    if not path.is_file():
+        return False
+
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    suffix = path.suffix or ".mp4"
+    fd, temp_name = tempfile.mkstemp(suffix=suffix, dir=str(path.parent))
+    try:
+        import os
+        os.close(fd)
+    except Exception:
+        pass
+    temp_path = Path(temp_name)
+    try:
+        temp_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+    cmd = [
+        ffmpeg_exe,
+        "-y",
+        "-i",
+        str(path),
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        "-map_metadata",
+        "-1",
+        "-map_chapters",
+        "-1",
+        str(temp_path),
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if result.returncode != 0 or not temp_path.exists() or temp_path.stat().st_size == 0:
+            if temp_path.exists():
+                temp_path.unlink()
+            return False
+        temp_path.replace(path)
+        return True
+    except Exception:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+        return False
